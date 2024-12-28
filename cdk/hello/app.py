@@ -3,6 +3,7 @@
 import aws_cdk as cdk
 
 from hello.hello_stack import HelloStack
+from lambdaStack.lambda_stack import LambdaStack
 
 app = cdk.App()
 HelloStack(app, "HelloStack",
@@ -22,5 +23,7 @@ HelloStack(app, "HelloStack",
 
            # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
            )
+
+LambdaStack(app, "LambdaStack", )
 
 app.synth()
