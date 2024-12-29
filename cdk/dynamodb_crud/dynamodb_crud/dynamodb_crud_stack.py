@@ -36,13 +36,13 @@ class DynamodbCrudStack(Stack):
                                             log_retention=logs.RetentionDays.ONE_WEEK)
 
         # API Gateways
-        create_user_api = apigateway.LambdaRestApi(self, 'create_user_api', handler=create_user_lambda)
-        create_user_resource = create_user_api.root.add_resource('user')
-        create_user_resource.add_method('POST')
+        user_api = apigateway.RestApi(self, 'user_service')
 
-        get_users_api = apigateway.LambdaRestApi(self, 'get_users_api', handler=get_users_lambda)
-        get_users_resource = get_users_api.root.add_resource('users')
-        get_users_resource.add_method('GET')
+        create_user_resource = user_api.root.add_resource('user')
+        create_user_resource.add_method('POST', apigateway.LambdaIntegration(create_user_lambda))
+
+        get_users_resource = user_api.root.add_resource('users')
+        get_users_resource.add_method('GET', apigateway.LambdaIntegration(get_users_lambda))
 
         # Permissions
         ddb.grant_write_data(create_user_lambda)
@@ -51,5 +51,4 @@ class DynamodbCrudStack(Stack):
         # Destroy policy
         create_user_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
         get_users_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
-        create_user_api.apply_removal_policy(RemovalPolicy.DESTROY)
-        get_users_api.apply_removal_policy(RemovalPolicy.DESTROY)
+        user_api.apply_removal_policy(RemovalPolicy.DESTROY)
