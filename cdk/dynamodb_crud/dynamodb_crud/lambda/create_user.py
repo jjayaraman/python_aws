@@ -4,24 +4,24 @@ import boto3
 from botocore.exceptions import ClientError
 
 dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table("users")
+table = dynamodb.Table("Users")
 
 
 def lambda_handler(event, context):
     print(json.dumps(event, indent=2))
-    first_name = event["first_name"]
-    last_name = event["last_name"]
-
-    user = {
-        "first_name": first_name,
-        "last_name": last_name
-    }
-
     try:
+
+        user_str = event.get("body")
+        if not user_str:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing request body"})
+            }
+        user = json.loads(user_str)
         table.put_item(Item=user)
         return {
             "statusCode": 200,
-            "body": "User created "
+            "body": f"User created: {user_str}"
         }
 
     except ClientError as e:
