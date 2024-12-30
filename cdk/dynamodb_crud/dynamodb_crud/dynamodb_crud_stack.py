@@ -47,8 +47,13 @@ class DynamodbCrudStack(Stack):
                                               code=_lambda.Code.from_asset("dynamodb_crud/lambda"),
                                               runtime=RUNTIME_PYTHON,
                                               memory_size=MEMORY_SIZE, timeout=TIMEOUT,
-                                              log_retention=RETENTION_DAYS
-                                              )
+                                              log_retention=RETENTION_DAYS)
+
+        delete_user_lambda = _lambda.Function(self, "delete_user", handler="delete_user.lambda_handler",
+                                              code=_lambda.Code.from_asset("dynamodb_crud/lambda"),
+                                              runtime=RUNTIME_PYTHON,
+                                              memory_size=MEMORY_SIZE, timeout=TIMEOUT,
+                                              log_retention=RETENTION_DAYS)
 
         # API Gateway
         user_api = apigateway.RestApi(self, 'user_service')
@@ -59,17 +64,20 @@ class DynamodbCrudStack(Stack):
         user_resource = user_api.root.add_resource('user')
         user_resource.add_method('POST', apigateway.LambdaIntegration(create_user_lambda))
 
-        user_resource_put = user_resource.add_resource("{id}")
-        user_resource_put.add_method("PUT", apigateway.LambdaIntegration(update_user_lambda))
+        user_resource_id = user_resource.add_resource("{id}")
+        user_resource_id.add_method("PUT", apigateway.LambdaIntegration(update_user_lambda))
+        user_resource_id.add_method("DELETE", apigateway.LambdaIntegration(delete_user_lambda))
 
         # Permissions
         ddb.grant_read_data(get_users_lambda)
         ddb.grant_write_data(create_user_lambda)
         ddb.grant_write_data(update_user_lambda)
+        ddb.grant_full_access(delete_user_lambda)
 
         # Destroy policy
         get_users_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
         create_user_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
         update_user_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
+        delete_user_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
 
         user_api.apply_removal_policy(RemovalPolicy.DESTROY)
