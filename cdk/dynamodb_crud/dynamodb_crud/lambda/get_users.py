@@ -1,3 +1,7 @@
+"""
+Python Lambda to get records from DynamoDB using scan
+"""
+
 import json
 
 import boto3

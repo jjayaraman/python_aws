@@ -1,3 +1,7 @@
+"""
+Python Lambda to create a record in DynamoDB using put_item
+"""
+
 import json
 
 import boto3
