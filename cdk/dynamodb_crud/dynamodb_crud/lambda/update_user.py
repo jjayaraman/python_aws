@@ -3,15 +3,20 @@ Python Lambda to update a record in DynamoDB using update_item
 """
 
 import json
+import logging
 
-import boto3
+from botocore.exceptions import ClientError
 
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('Users')
+import layer.utils as utils
+from layer.user_service import update
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def lambda_handler(event, context):
-    print('update_user lambda event:', json.dumps(event))
+    logger.debug('update_user lambda event:', json.dumps(event))
 
     # Get user_id from path parameters
     path_parameters = event.get("pathParameters")
@@ -22,40 +27,34 @@ def lambda_handler(event, context):
 
     try:
         if not user_id:
-            return {
-                "statusCode": 400,
-                "body": "Missing 'id' path parameter"
-            }
+            api_response = utils.build_response(400, "Invalid request. User id missing in the path parameter")
+            return api_response
 
         if not user_str:
-            return {
-                "statusCode": 400,
-                "body": "Missing 'id' path parameter"
-            }
+            api_response = utils.build_response(400, "Invalid request. User payload missing in body")
+            return api_response
 
         user = json.loads(user_str)
 
         first_name = user["first_name"]
         last_name = user["last_name"]
+        response = update(user_id, first_name, last_name)
+        logger.debug(f"response: {response}")
 
-        partition_key = {"user_id": user_id}
-        update_expression = "SET #first_name = :first_name, #last_name = :last_name"
-        expression_attribute_names = {"#first_name": "first_name", "#last_name": "last_name"}
-        expression_attribute_values = {":first_name": first_name, ":last_name": last_name}
+        api_response = utils.build_response(200, "User updated successfully")
+        return api_response
 
-        response = table.update_item(Key=partition_key, UpdateExpression=update_expression,
-                                     ExpressionAttributeNames=expression_attribute_names,
-                                     ExpressionAttributeValues=expression_attribute_values,
-                                     ReturnValues="UPDATED_NEW"
-                                     )
-        return {
-            "statusCode": 200,
-            "body": json.dumps(response)
-        }
+    except json.JSONDecodeError as e:
+        # Handle JSON errors
+        utils.handle_json_decode_error(e)
+
+    except ClientError as e:
+        # Handle AWS-specific errors
+        utils.handle_aws_error(e)
 
     except Exception as e:
-        # Handle any exceptions
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": f"An unexpected error occurred: {str(e)}"})
-        }
+        # Handle any other exceptions
+        utils.handle_error(e)
+
+    finally:
+        logger.debug('All done')

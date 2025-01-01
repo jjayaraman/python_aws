@@ -3,42 +3,42 @@ Python Lambda to create a record in DynamoDB using put_item
 """
 
 import json
+import logging
 
-import boto3
 from botocore.exceptions import ClientError
 
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table("Users")
+import layer.utils as utils
+from layer.user_service import create
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def lambda_handler(event, context):
-    print(json.dumps(event, indent=2))
+    logger.debug(json.dumps(event, indent=2))
     try:
 
         user_str = event.get("body")
         if not user_str:
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "Missing request body"})
-            }
+            api_response = utils.build_response(400, json.dumps({"error": "Missing request body"}))
+            return api_response
+
         user = json.loads(user_str)
-        table.put_item(Item=user)
-        return {
-            "statusCode": 200,
-            "body": f"User created: {user_str}"
-        }
+        response = create(user)
+        logger.debug(f"User create response: {response}")
+
+        api_response = utils.build_response(200, f"User create successfully")
+        return api_response
+
+    except json.JSONDecodeError as e:
+        # Handle JSON errors
+        utils.handle_json_decode_error(e)
 
     except ClientError as e:
         # Handle AWS-specific errors
-        error_message = e.response['Error']['Message']
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": f"AWS ClientError: {error_message}"})
-        }
+        utils.handle_aws_error(e)
 
     except Exception as e:
         # Handle any other exceptions
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": f"An unexpected error occurred: {str(e)}"})
-        }
+        utils.handle_error(e)

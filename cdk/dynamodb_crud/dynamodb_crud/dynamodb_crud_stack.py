@@ -30,32 +30,45 @@ class DynamodbCrudStack(Stack):
                              write_capacity=2, billing_mode=dynamodb.BillingMode.PROVISIONED,
                              removal_policy=RemovalPolicy.DESTROY)
 
+        # Lambda layer
+        user_service_layer = _lambda.LayerVersion(self, "user_service_layer",
+                                                  code=_lambda.Code.from_asset("dynamodb_crud/lambda/layer"),
+                                                  compatible_runtimes=[RUNTIME_PYTHON])
+
         # Lambdas
         get_users_lambda = _lambda.Function(self, "get_users", handler="get_users.lambda_handler",
                                             code=_lambda.Code.from_asset("dynamodb_crud/lambda"),
                                             runtime=RUNTIME_PYTHON,
                                             memory_size=MEMORY_SIZE, timeout=TIMEOUT,
-                                            log_retention=RETENTION_DAYS)
+                                            log_retention=RETENTION_DAYS,
+                                            layers=[user_service_layer]
+                                            )
 
         create_user_lambda = _lambda.Function(self, "create_user", handler="create_user.lambda_handler",
                                               code=_lambda.Code.from_asset("dynamodb_crud/lambda"),
                                               runtime=RUNTIME_PYTHON,
                                               memory_size=MEMORY_SIZE, timeout=TIMEOUT,
-                                              log_retention=RETENTION_DAYS)
+                                              log_retention=RETENTION_DAYS,
+                                              layers=[user_service_layer]
+                                              )
 
         update_user_lambda = _lambda.Function(self, "update-user", handler="update_user.lambda_handler",
                                               code=_lambda.Code.from_asset("dynamodb_crud/lambda"),
                                               runtime=RUNTIME_PYTHON,
                                               memory_size=MEMORY_SIZE, timeout=TIMEOUT,
-                                              log_retention=RETENTION_DAYS)
+                                              log_retention=RETENTION_DAYS,
+                                              layers=[user_service_layer]
+                                              )
 
         delete_user_lambda = _lambda.Function(self, "delete_user", handler="delete_user.lambda_handler",
                                               code=_lambda.Code.from_asset("dynamodb_crud/lambda"),
                                               runtime=RUNTIME_PYTHON,
                                               memory_size=MEMORY_SIZE, timeout=TIMEOUT,
-                                              log_retention=RETENTION_DAYS)
+                                              log_retention=RETENTION_DAYS,
+                                              layers=[user_service_layer]
+                                              )
 
-        # API Gateway
+        # APIs
         user_api = apigateway.RestApi(self, 'user_service')
 
         users_resource = user_api.root.add_resource('users')
