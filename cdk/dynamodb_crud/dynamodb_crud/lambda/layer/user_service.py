@@ -3,6 +3,7 @@ Helper service to create CRUD operations on Users table in DynamoDB
 """
 
 import logging
+from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -26,10 +27,10 @@ def create(user) -> dict:
         raise e
 
 
-def update(user_id, first_name, last_name) -> dict:
+def update(user_id: str, timestamp: str, first_name: str, last_name: str) -> dict:
     try:
 
-        partition_key = {"user_id": user_id}
+        partition_key = {"user_id": user_id, "timestamp": timestamp}
         update_expression = "SET #first_name = :first_name, #last_name = :last_name"
         expression_attribute_names = {"#first_name": "first_name", "#last_name": "last_name"}
         expression_attribute_values = {":first_name": first_name, ":last_name": last_name}
@@ -44,15 +45,15 @@ def update(user_id, first_name, last_name) -> dict:
         raise e
 
 
-def delete(user_id: str):
-    logger.debug(f"user_id {user_id}")
+def delete(user_id: str, timestamp: str):
+    logger.debug(f"user_id {user_id}, timestamp: {timestamp}")
     try:
-        key = {"user_id": user_id}
         # check if user exists
-        exists = check_if_user_exists(user_id)
+        exists = check_if_user_exists(user_id, timestamp)
         print(f"user exists: {exists}")
         # Delete user
         if exists:
+            key = {"user_id": user_id, "timestamp": timestamp}
             response = table.delete_item(Key=key)
             return response
         else:
@@ -72,10 +73,11 @@ def get_users():
         raise e
 
 
-def get_user(user_id):
+def get_user_by_id(user_id: str, timestamp: str):
     try:
-        key = {"user_id": user_id}
+        key = {"user_id": user_id, "timestamp": timestamp}
         response = table.get_item(Key=key)
+        # response = table.query(KeyConditionExpression=Key('user_id').eq(user_id))
         logger.debug(f"response: {response}")
         # Return the item if it exists, else None
         return response.get('Item', None)
@@ -84,16 +86,33 @@ def get_user(user_id):
         raise e
 
 
-def get_user_by_first_name(first_name: str):
+def search_users(first_name: Any, last_name: Any):
+    global response
     try:
-        response = table.query(KeyConditionExpression=Key('first_name').eq(first_name))
+        if first_name and last_name:
+            response_fn = table.query(IndexName='first_name_gsi',
+                                      KeyConditionExpression=Key('first_name').eq(first_name))
+
+            response_ln = table.query(IndexName='last_name_gsi',
+                                      KeyConditionExpression=Key('last_name').eq(last_name))
+            response = [item for item in response_fn if item in response_ln]
+
+        elif first_name and not last_name:
+            response = table.query(IndexName='first_name_gsi',
+                                   KeyConditionExpression=Key('first_name').eq(first_name))
+
+        elif not first_name and last_name:
+            response = table.query(IndexName='last_name_gsi',
+                                   KeyConditionExpression=Key('last_name').eq(last_name))
+
         return response
+
     except Exception as e:
         raise e
 
 
-def check_if_user_exists(user_id):
-    user = get_user(user_id)
+def check_if_user_exists(user_id: str, timestamp: str):
+    user = get_user_by_id(user_id, timestamp)
     logger.info(f"user : {user}")
     if user is not None:
         return True

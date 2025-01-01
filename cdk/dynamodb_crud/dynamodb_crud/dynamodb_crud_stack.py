@@ -7,7 +7,7 @@ from aws_cdk import (
     RemovalPolicy, Duration,
 )
 
-from aws_cdk.aws_dynamodb import Attribute
+from aws_cdk.aws_dynamodb import Attribute, AttributeType
 from constructs import Construct
 
 # Lambda Constants
@@ -26,9 +26,16 @@ class DynamodbCrudStack(Stack):
         # DynamoDB
         ddb = dynamodb.Table(self, "Users", table_name="Users",
                              partition_key=Attribute(name="user_id", type=dynamodb.AttributeType.STRING),
+                             sort_key=Attribute(name="timestamp", type=AttributeType.STRING),
                              read_capacity=2,
                              write_capacity=2, billing_mode=dynamodb.BillingMode.PROVISIONED,
                              removal_policy=RemovalPolicy.DESTROY)
+        ddb.add_global_secondary_index(index_name="first_name_gsi",
+                                       partition_key=Attribute(name="first_name", type=AttributeType.STRING))
+        ddb.add_global_secondary_index(index_name="last_name_gsi",
+                                       partition_key=Attribute(name="last_name", type=AttributeType.STRING))
+
+        # API Gateway
 
         # Lambda layer
         user_service_layer = _lambda.LayerVersion(self, "user_service_layer",
@@ -43,6 +50,12 @@ class DynamodbCrudStack(Stack):
                                             log_retention=RETENTION_DAYS,
                                             layers=[user_service_layer]
                                             )
+        search_users_lambda = _lambda.Function(self, "search_users", handler="search_users.lambda_handler",
+                                               code=_lambda.Code.from_asset("dynamodb_crud/lambda"),
+                                               runtime=RUNTIME_PYTHON,
+                                               memory_size=MEMORY_SIZE, timeout=TIMEOUT,
+                                               log_retention=RETENTION_DAYS,
+                                               layers=[user_service_layer])
 
         create_user_lambda = _lambda.Function(self, "create_user", handler="create_user.lambda_handler",
                                               code=_lambda.Code.from_asset("dynamodb_crud/lambda"),
@@ -74,21 +87,26 @@ class DynamodbCrudStack(Stack):
         users_resource = user_api.root.add_resource('users')
         users_resource.add_method('GET', apigateway.LambdaIntegration(get_users_lambda))
 
+        search_resource = users_resource.add_resource("search")
+        search_resource.add_method("GET", apigateway.LambdaIntegration(search_users_lambda))
+
         user_resource = user_api.root.add_resource('user')
         user_resource.add_method('POST', apigateway.LambdaIntegration(create_user_lambda))
 
-        user_resource_id = user_resource.add_resource("{id}")
+        user_resource_id = user_resource.add_resource("{id}").add_resource("{timestamp}")
         user_resource_id.add_method("PUT", apigateway.LambdaIntegration(update_user_lambda))
         user_resource_id.add_method("DELETE", apigateway.LambdaIntegration(delete_user_lambda))
 
         # Permissions
         ddb.grant_read_data(get_users_lambda)
+        ddb.grant_read_data(search_users_lambda)
         ddb.grant_write_data(create_user_lambda)
         ddb.grant_write_data(update_user_lambda)
         ddb.grant_full_access(delete_user_lambda)
 
         # Destroy policy
         get_users_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
+        search_users_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
         create_user_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
         update_user_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
         delete_user_lambda.apply_removal_policy(RemovalPolicy.DESTROY)

@@ -21,6 +21,7 @@ def lambda_handler(event, context):
     # Get user_id from path parameters
     path_parameters = event.get("pathParameters")
     user_id = path_parameters.get("id")
+    timestamp = path_parameters.get("timestamp")
 
     # Get API payload from body
     user_str = event.get('body')
@@ -38,7 +39,8 @@ def lambda_handler(event, context):
 
         first_name = user["first_name"]
         last_name = user["last_name"]
-        response = update(user_id, first_name, last_name)
+        # timestamp = user["timestamp"]
+        response = update(user_id, timestamp, first_name, last_name)
         logger.debug(f"response: {response}")
 
         api_response = utils.build_response(200, "User updated successfully")
